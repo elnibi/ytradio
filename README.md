@@ -5,7 +5,7 @@ rekomendasi YouTube Music terus mengisi antrian. Audio saja lewat mpv, tanpa bro
 
 ## Install
 
-Butuh Python 3.10 atau lebih baru.
+Butuh Python 3.11 atau lebih baru.
 
 ```
 pip install -r requirements.txt
@@ -17,6 +17,10 @@ Butuh juga **mpv** dan **yt-dlp**:
 |---------|--------------------------------|---------------------------------|
 | Windows | `winget install shinchiro.mpv` | `winget install yt-dlp.yt-dlp`  |
 | Linux   | `sudo apt install mpv`         | `pip install --upgrade yt-dlp`  |
+
+mpv dijalankan dengan `--no-config`, jadi `mpv.conf` milikmu diabaikan (YT Radio yang menentukan
+volume, filter, dan format audio-nya). `yt-dlp` yang dipakai adalah yang pertama ditemukan di
+PATH/konfigurasi winget; hasil `pip install` hanya dipakai kalau tidak ada yang lain.
 
 ## Pakai
 
@@ -31,7 +35,17 @@ ytradio --sleep 30 --volume 60            # opsi lain: python ytradio.py --help
 (`ytradio.bat` di Windows, `ytradio.sh` di Linux.)
 
 Opsi: `--volume N`, `--no-norm` (normalisasi volume mati), `--no-ipv4` (jangan paksa IPv4),
-`--sleep MENIT`.
+`--sleep MENIT` (`0` = mati).
+
+## Struktur Kode
+
+| File                    | Isi                                                                     |
+|-------------------------|-------------------------------------------------------------------------|
+| `ytradio.py`            | logika radio di kelas `Radio`, bisa diuji tanpa mpv dan jaringan        |
+| `test_ytradio.py`       | unit test untuk ytradio.py                                              |
+
+Seluruh kelas `Radio` bisa diuji dengan mpv + ytmusicapi palsu tanpa mpv sungguhan maupun jaringan
+(`python -m unittest test_ytradio`).
 
 ## Kontrol
 
@@ -59,7 +73,7 @@ pasang skrip [mpv-mpris](https://github.com/hoyon/mpv-mpris).
 |--------------------------|---------------------------------------------------------|
 | `.ytradio.json`          | lagu, posisi, dan volume terakhir (untuk lanjut)        |
 | `.ytradio-favorites.txt` | lagu yang di-`l`                                        |
-| `.ytradio-history.txt`   | riwayat putar                                           |
+| `.ytradio-history.txt`   | riwayat putar (5000 baris terakhir)                     |
 | `.ytradio-blocked.json`  | artis yang di-`x`; hapus namanya dari sini untuk buka blokir |
 
 ## Kalau ada masalah
@@ -83,14 +97,16 @@ dipakai bersama, jadi "lanjut lagu terakhir" mengikuti jendela yang terakhir men
   thread terpisah dari lagu terakhir di antrian (cadangan: lagu yang sedang main, lalu lagu acak dari
   antrian). Kalau buntu atau gagal, dicoba lagi dengan jeda 15 dtk, berlipat sampai maks. 5 menit.
 - Lagu yang sama tidak diputar ulang, termasuk versi lain dengan videoId berbeda (MV, lyric video,
-  remaster).
+  remaster) dan varian yang_fitur-nya tidak disebut (mis. `Yellow` vs `Yellow (feat. X)`).
 - mpv diputar tanpa jendela dan dikendalikan lewat JSON IPC: satu koneksi untuk perintah, satu untuk
   event (status diperbarui begitu ada perubahan). Playlist mpv hanya menyimpan 20 lagu yang sudah
   lewat supaya tetap ringan saat jalan berjam-jam.
+- Di `ytradio.py`, logika radio ada di kelas `Radio`: loop utama cuma memanggil `tick()` sekali
+  per putaran dan menahan error per putaran supaya radio tidak berhenti.
 - Volume antar lagu disamakan dengan filter `dynaudnorm` (tombol `a`).
 
 ## Test
 
 ```
-python -m unittest -v
+python -m unittest -v test_ytradio
 ```

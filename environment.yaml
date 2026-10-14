@@ -1,0 +1,24 @@
+initialize:
+  - run: |
+      pip install -r requirements.txt
+      pip install ruff mypy
+
+maintenance:
+  - run: |
+      pip install --upgrade ytmusicapi yt-dlp
+
+knowledge:
+  - name: lint
+    contents: |
+      ruff check . --ignore BLE001,S110,DTZ005,SIM115
+  - name: typecheck
+    contents: |
+      mypy . --ignore-missing-imports
+  - name: test
+    contents: |
+      python -m unittest -v test_ytradio
+  - name: startup
+    contents: |
+      python ytradio.py --help
+      # For Windows: ytradio.bat
+      # For Linux: ./ytradio.sh
