@@ -75,12 +75,14 @@ pasang skrip [mpv-mpris](https://github.com/hoyon/mpv-mpris).
 | `.ytradio-favorites.txt` | lagu yang di-`l`                                        |
 | `.ytradio-history.txt`   | riwayat putar (5000 baris terakhir)                     |
 | `.ytradio-blocked.json`  | artis yang di-`x`; hapus namanya dari sini untuk buka blokir |
+| `.ytradio.log`           | error pemutaran dengan judul/video ID dan diagnostik mpv |
 
 ## Kalau ada masalah
 
 | Gejala                                         | Coba                                                         |
 |------------------------------------------------|--------------------------------------------------------------|
 | `✗ lagu gagal diputar` berturut-turut          | cek internet, lalu update yt-dlp (`winget upgrade yt-dlp.yt-dlp` / `pip install -U yt-dlp`) |
+| lagu tertentu gagal diputar                    | periksa `.ytradio.log` di folder home untuk kode error dan diagnostik mpv |
 | `[rekomendasi habis, coba lagi dalam N dtk]`   | biarkan saja (dicoba ulang otomatis), atau `s` untuk ganti lagu awal |
 | koneksi lambat / timeout                       | kalau IPv6 kamu justru lancar, jalankan dengan `--no-ipv4`   |
 | `mpv tidak ditemukan` / `yt-dlp tidak ditemukan` | install sesuai tabel di atas, lalu buka terminal baru      |

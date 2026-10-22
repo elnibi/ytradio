@@ -77,6 +77,7 @@ STATE_FILE = os.path.join(HOME, ".ytradio.json")
 BLOCKED_FILE = os.path.join(HOME, ".ytradio-blocked.json")
 FAVORITES_FILE = os.path.join(HOME, ".ytradio-favorites.txt")
 HISTORY_FILE = os.path.join(HOME, ".ytradio-history.txt")
+LOG_FILE = os.path.join(HOME, ".ytradio.log")
 
 HELP = (
     "Kontrol: spasi=pause  n/>=next  p/<=prev  ←/→=mundur/maju 10 dtk  "
@@ -290,6 +291,16 @@ def append_line(path: str, line: str, keep: int = 0) -> None:
             trim_lines(path, keep)
     except OSError:
         pass
+
+
+def log_line(path: str, source: str, message: str) -> None:
+    """Append one timestamped diagnostic line."""
+    line = message.rstrip("\r\n")
+    append_line(
+        path,
+        f"{datetime.datetime.now().astimezone():%Y-%m-%d %H:%M:%S} [{source}] {line}",
+        keep=2000,
+    )
 
 
 # --------------------------------------------------------------------------- tracks
@@ -730,8 +741,13 @@ class MpvPlayer:
     """Proses mpv + dua koneksi IPC (perintah & event), dijamin dimatikan saat keluar."""
 
     def __init__(
-        self, volume: int = 80, norm: bool = True, force_ipv4: bool = True
+        self,
+        volume: int = 80,
+        norm: bool = True,
+        force_ipv4: bool = True,
+        log_file: str = LOG_FILE,
     ) -> None:
+        self.log_file = log_file
         self.ipc: Mpv | None = None
         self.evc: Mpv | None = None
         self.proc = subprocess.Popen(
@@ -749,7 +765,7 @@ class MpvPlayer:
                 "--ytdl-raw-options-append=extractor-args=youtube:player_client=web_music,mweb",
                 *([] if not force_ipv4 else ["--ytdl-raw-options-append=force-ipv4="]),
                 f"--input-ipc-server={PIPE}",
-                "--msg-level=all=no",  # error ditampilkan sendiri lewat event IPC (1 baris)
+                "--msg-level=all=warn",
                 "--prefetch-playlist=yes",
                 f"--volume={max(0, min(100, volume))}",
                 *([] if not norm else [f"--af={NORM_FILTER}"]),
@@ -757,8 +773,19 @@ class MpvPlayer:
             ],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
+        self.stderr_thread = threading.Thread(target=self._log_stderr, daemon=True)
+        self.stderr_thread.start()
+
+    def _log_stderr(self) -> None:
+        if self.proc.stderr is None:
+            return
+        for line in self.proc.stderr:
+            log_line(self.log_file, "mpv", line)
 
     def __enter__(self) -> Self:
         try:
@@ -798,6 +825,7 @@ class Settings:
     state_every: int = STATE_EVERY
     state_file: str = STATE_FILE
     history_file: str = HISTORY_FILE
+    log_file: str = LOG_FILE
     favorites_file: str = FAVORITES_FILE
     blocked_file: str = BLOCKED_FILE
 
@@ -843,6 +871,21 @@ class Radio:
         elif name == "end-file" and ev.get("reason") == "error":
             self.fails += 1
             err = ev.get("file_error")
+            vid = video_id_from(self.props.get("path") or "")
+            log_line(
+                self.settings.log_file,
+                "playback-error",
+                json.dumps(
+                    {
+                        "title": self.ui.labels.get(vid)
+                        or self.props.get("media-title"),
+                        "video_id": vid,
+                        "path": self.props.get("path"),
+                        "file_error": err,
+                    },
+                    ensure_ascii=False,
+                ),
+            )
             self.ui.say(f"  ✗ lagu gagal diputar{f' ({err})' if err else ''}, dilewati")
             if self.fails == 3:
                 self.ui.say(
@@ -1209,7 +1252,10 @@ def main(argv=None):
     ui = Ui()
     try:
         with MpvPlayer(
-            volume, norm=settings.norm, force_ipv4=not args.no_ipv4
+            volume,
+            norm=settings.norm,
+            force_ipv4=not args.no_ipv4,
+            log_file=settings.log_file,
         ) as player:
             settings.loadfile_has_index = detect_loadfile_index(player.ipc)
             blocked = load_json(BLOCKED_FILE, [])

@@ -116,6 +116,7 @@ class TestCase(unittest.TestCase):
         return yr.Settings(
             state_file=os.path.join(self.tmp, "state.json"),
             history_file=os.path.join(self.tmp, "history.txt"),
+            log_file=os.path.join(self.tmp, "ytradio.log"),
             favorites_file=os.path.join(self.tmp, "fav.txt"),
             blocked_file=os.path.join(self.tmp, "blocked.json"),
             **overrides,
@@ -812,6 +813,16 @@ class TestEvents(TestCase):
         self.assertIn("3 lagu", radio.ui.said)
         self.assertIn(yr.UPDATE_HINT, radio.ui.said)
 
+    def test_error_putar_dicatat_dengan_konteks_lagu(self):
+        radio = self.radio(yt=FakeYT([track("Yellow", "Coldplay", vid=V1)]))
+        radio.ui.labels[V1] = "Coldplay - Yellow"
+        self.playing(radio, V1)
+        radio.on_event({"event": "end-file", "reason": "error", "file_error": "403"})
+        log = self.read(radio.settings.log_file)
+        self.assertIn('"title": "Coldplay - Yellow"', log)
+        self.assertIn(f'"video_id": "{V1}"', log)
+        self.assertIn('"file_error": "403"', log)
+
     def test_file_loaded_reset_fails(self):
         radio = self.radio()
         radio.on_event({"event": "end-file", "reason": "error"})
@@ -896,6 +907,13 @@ class TestSettings(TestCase):
 
 
 class TestHelpers(TestCase):
+    def test_log_line_menambah_timestamp_dan_sumber(self):
+        path = os.path.join(self.tmp, "ytradio.log")
+        yr.log_line(path, "mpv", "ytdl_hook: gagal\n")
+        line = self.read(path)
+        self.assertIn("[mpv] ytdl_hook: gagal", line)
+        self.assertRegex(line, r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+
     def test_int_or(self):
         self.assertEqual(yr.int_or(80, 0), 80)
         self.assertEqual(yr.int_or("55", 0), 55)
